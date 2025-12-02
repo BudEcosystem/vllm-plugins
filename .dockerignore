@@ -1,0 +1,104 @@
+# Git and version control
+.git/
+.gitignore
+.gitattributes
+
+# Documentation and development files
+*.md
+!README.md
+docs/
+CLAUDE.md
+
+# IDE and editor files
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+*~
+.cursorignore
+.cursorindexingignore
+
+# Python cache and build artifacts
+__pycache__/
+*.py[codz]
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.hypothesis/
+
+# Python distribution and packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.envrc
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.pixi/
+__pypackages__/
+
+# Testing and coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py.cover
+cover/
+
+# Logs and temporary files
+*.log
+tmp/
+*.tmp
+*.temp
+
+# Docker files (don't copy Docker files into the image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Scripts (if not needed in runtime)
+scripts/
+
+# Development tools
+.abstra/
+.pdm-python
+.pdm-build/

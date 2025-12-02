@@ -1,0 +1,29 @@
+[project]
+name = "vllm-plugin-example"
+version = "0.1.0"
+description = "Example/template vLLM plugin demonstrating best practices"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "Apache-2.0"}
+dependencies = [
+    "vllm>=0.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+]
+
+# Entry point for vLLM plugin discovery
+# vLLM will automatically call the registered function on startup
+[project.entry-points."vllm.general_plugins"]
+example_plugin = "vllm_plugin_example.register:register"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["vllm_plugin_example*"]

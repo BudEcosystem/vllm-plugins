@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  vllm-server:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL=Qwen/Qwen2.5-0.5B-Instruct
+      # Enable specific logits processors (comma-separated)
+      # - VLLM_PLUGINS=entropy_decoder,cot_decoder
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      # Cache HuggingFace models
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

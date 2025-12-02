@@ -1,0 +1,29 @@
+[project]
+name = "vllm-custom-models"
+version = "0.1.0"
+description = "Custom model implementations for vLLM"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "Apache-2.0"}
+dependencies = [
+    "vllm>=0.8.0",
+    "torch>=2.0.0",
+    "transformers>=4.40.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+]
+
+[project.entry-points."vllm.general_plugins"]
+custom_models = "vllm_custom_models.register:register"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["vllm_custom_models*"]

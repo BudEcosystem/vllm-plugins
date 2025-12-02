@@ -1,0 +1,39 @@
+# Root pyproject.toml for development tooling
+# Individual plugins have their own pyproject.toml for packaging
+
+[project]
+name = "vllm-plugins-workspace"
+version = "0.1.0"
+description = "Monorepo for vLLM plugins"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "Apache-2.0"}
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+    "build>=1.0",
+    "pre-commit>=3.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["plugins"]
+python_files = "test_*.py"
+asyncio_mode = "auto"

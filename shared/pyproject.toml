@@ -1,0 +1,21 @@
+[project]
+name = "vllm-plugin-utils"
+version = "0.1.0"
+description = "Shared utilities for vLLM plugins"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "Apache-2.0"}
+dependencies = [
+    "packaging>=21.0",
+]
+
+[project.optional-dependencies]
+vllm = ["vllm>=0.8.0"]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["vllm_plugin_utils*"]
