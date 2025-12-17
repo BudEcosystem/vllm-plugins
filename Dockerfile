@@ -16,6 +16,7 @@ RUN pip install -e /app/shared/
 # Install decoding strategy plugins
 RUN pip install -e /app/plugins/vllm-entropy-decoder/
 # RUN pip install -e /app/plugins/vllm-cot-decoder/
+RUN pip install -e /app/plugins/vllm-dynamic-loader/.[api]
 
 # Verify plugins are installed
 RUN python -c "from importlib.metadata import entry_points; \

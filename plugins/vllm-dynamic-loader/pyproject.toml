@@ -1,0 +1,67 @@
+[project]
+name = "vllm-dynamic-loader"
+version = "0.1.0"
+description = "Dynamic plugin loader for vLLM - load, unload, and hot-swap plugins at runtime"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "vLLM Plugins Team"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "watchdog>=4.0.0",
+    "filelock>=3.12.0",
+    "requests>=2.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-mock>=3.10",
+    "httpx>=0.25",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+]
+api = [
+    "fastapi>=0.100",
+    "pydantic>=2.0",
+]
+
+[project.entry-points."vllm.general_plugins"]
+dynamic_loader = "vllm_dynamic_loader.register:register"
+
+[project.entry-points."vllm.logits_processors"]
+hotswap_proxy = "vllm_dynamic_loader.hotswap.proxy:HotSwapProxyProcessor"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["vllm_dynamic_loader*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
