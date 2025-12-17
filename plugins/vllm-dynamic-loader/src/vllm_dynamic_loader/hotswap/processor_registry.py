@@ -2,6 +2,8 @@
 
 import importlib
 import logging
+import sys
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, Type
 
 if TYPE_CHECKING:
@@ -61,27 +63,84 @@ class ProcessorRegistry:
     @classmethod
     def _discover_entry_point_processors(cls) -> None:
         """Discover processors via Python entry points."""
+        # Invalidate import caches to pick up newly installed packages
+        importlib.invalidate_caches()
+
         try:
             from importlib.metadata import entry_points
 
-            # Look for processors in a dedicated group for hot-swap
-            all_eps = entry_points()
-            # Python 3.10+ returns SelectableGroups with select() method
-            # Python 3.9 returns a dict-like object
-            if hasattr(all_eps, "select"):
-                eps = list(all_eps.select(group="vllm_hotswap.processors"))
-            else:
-                # Python 3.9 compatibility
-                eps = list(all_eps.get("vllm_hotswap.processors", []))  # type: ignore[union-attr]
+            # Check multiple entry point groups
+            groups = [
+                "vllm_hotswap.processors",  # Dedicated hot-swap group
+                "vllm.logits_processors",   # Standard vLLM logits processors
+            ]
 
-            for ep in eps:
-                try:
-                    processor_class = ep.load()
-                    cls.register(ep.name, processor_class)
-                except Exception as e:
-                    logger.warning(f"Failed to load processor '{ep.name}': {e}")
+            for group in groups:
+                all_eps = entry_points()
+                # Python 3.10+ returns SelectableGroups with select() method
+                # Python 3.9 returns a dict-like object
+                if hasattr(all_eps, "select"):
+                    eps = list(all_eps.select(group=group))
+                else:
+                    # Python 3.9 compatibility
+                    eps = list(all_eps.get(group, []))  # type: ignore[union-attr]
+
+                for ep in eps:
+                    # Skip if already registered
+                    if ep.name in cls._processors:
+                        continue
+
+                    try:
+                        processor_class = ep.load()
+                        cls.register(ep.name, processor_class)
+                    except Exception as e:
+                        logger.debug(f"Failed to load processor '{ep.name}' from {group}: {e}")
+
         except Exception as e:
             logger.debug(f"Entry point discovery failed: {e}")
+
+    @classmethod
+    def refresh(cls) -> None:
+        """Refresh the registry to discover newly installed processors."""
+        # Ensure editable package paths are in sys.path for this process
+        cls._ensure_editable_paths()
+        # Re-run entry point discovery without resetting existing processors
+        cls._discover_entry_point_processors()
+        logger.info(f"ProcessorRegistry refreshed: {len(cls._processors)} processors available")
+
+    @classmethod
+    def _ensure_editable_paths(cls) -> None:
+        """Ensure editable package paths are in sys.path.
+
+        This is needed for worker processes that were started before
+        a plugin was dynamically installed in the main process.
+        """
+        try:
+            from importlib.metadata import distributions
+
+            for dist in distributions():
+                # Check if this is an editable install
+                direct_url = dist.read_text("direct_url.json")
+                if direct_url:
+                    import json
+                    url_data = json.loads(direct_url)
+                    if url_data.get("dir_info", {}).get("editable"):
+                        # Get the source path
+                        source_path = url_data.get("url", "").replace("file://", "")
+                        if source_path:
+                            source_path_obj = Path(source_path)
+                            # Check for src/ layout
+                            src_dir = source_path_obj / "src"
+                            if src_dir.is_dir():
+                                import_path = str(src_dir)
+                            else:
+                                import_path = source_path
+
+                            if import_path and import_path not in sys.path:
+                                sys.path.insert(0, import_path)
+                                logger.info(f"Added editable path to sys.path: {import_path}")
+        except Exception as e:
+            logger.debug(f"Could not check editable paths: {e}")
 
     @classmethod
     def register(cls, name: str, processor_class: Type) -> None:

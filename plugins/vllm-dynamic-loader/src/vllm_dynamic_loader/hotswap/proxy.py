@@ -130,6 +130,9 @@ class HotSwapProxyProcessor:
             try:
                 from vllm_dynamic_loader.hotswap.processor_registry import ProcessorRegistry
 
+                # Refresh registry to discover newly installed processors
+                ProcessorRegistry.refresh()
+
                 new_delegate = ProcessorRegistry.load(
                     processor_name,
                     self._vllm_config,

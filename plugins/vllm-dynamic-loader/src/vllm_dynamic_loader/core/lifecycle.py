@@ -175,16 +175,56 @@ class PluginLifecycleManager:
 
         elif group == "vllm.logits_processors":
             # Logits processors are classes - vLLM will instantiate them
-            # WARNING: vLLM v1 applies these globally!
-            logger.warning(
-                f"Loaded logits processor '{name}'. "
-                "Note: This will apply to ALL requests. "
-                "Use HotSwapProxyProcessor for dynamic swapping."
-            )
+            # Automatically trigger hot-swap to make the processor active
+            self._trigger_hotswap(name)
 
         elif group == "vllm.stat_logger_plugins":
             # Stat loggers are classes instantiated by vLLM
             logger.info(f"Loaded stat logger '{name}'")
+
+    def _trigger_hotswap(self, processor_name: str) -> None:
+        """Trigger a hot-swap to activate a newly loaded processor.
+
+        Args:
+            processor_name: Name of the processor to activate.
+        """
+        try:
+            from vllm_dynamic_loader.hotswap.coordinator import SwapCoordinator
+            from vllm_dynamic_loader.config import get_config
+
+            config = get_config()
+
+            # Only auto-hotswap if enabled
+            if not config.auto_activate:
+                logger.info(
+                    f"Loaded logits processor '{processor_name}'. "
+                    "Auto-activation disabled. Use hot-swap API to activate."
+                )
+                return
+
+            coordinator = SwapCoordinator()
+            result = coordinator.request_swap(processor_name, timeout_seconds=10.0)
+
+            if result.get("results"):
+                success_count = sum(
+                    1 for r in result["results"].values()
+                    if r.get("status") == "success"
+                )
+                logger.info(
+                    f"Hot-swapped to processor '{processor_name}' "
+                    f"({success_count} process(es) acknowledged)"
+                )
+            else:
+                logger.warning(
+                    f"Hot-swap requested for '{processor_name}' but no processes acknowledged. "
+                    "The processor will be active on next request if HotSwapProxyProcessor is in use."
+                )
+
+        except Exception as e:
+            logger.warning(
+                f"Could not auto-hotswap to '{processor_name}': {e}. "
+                "Use the hot-swap API manually: POST /plugins/hot-swap"
+            )
 
     def deactivate_plugin(self, plugin_id: str) -> bool:
         """Deactivate and prepare a plugin for unloading.

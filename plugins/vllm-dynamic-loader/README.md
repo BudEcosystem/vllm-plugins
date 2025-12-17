@@ -114,7 +114,7 @@ Environment variables:
 |----------|---------|-------------|
 | `VLLM_PLUGIN_WATCH_DIR` | `/plugins` | Directory to watch for plugins |
 | `VLLM_PLUGIN_WATCH_ENABLED` | `true` | Enable directory watching |
-| `VLLM_PLUGIN_REGISTRY` | `/var/lib/vllm-plugins/registry.json` | Registry file path |
+| `VLLM_PLUGIN_REGISTRY` | `~/.local/share/vllm-plugins/registry.json` | Registry file path |
 | `VLLM_PLUGIN_AUTO_ACTIVATE` | `true` | Auto-activate installed plugins |
 | `VLLM_PLUGIN_API_ENABLED` | `true` | Enable REST API |
 | `VLLM_PLUGIN_API_PORT` | `8001` | Port for standalone API (if patching fails) |

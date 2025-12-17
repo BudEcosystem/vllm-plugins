@@ -52,6 +52,7 @@ class WatchedPlugin:
     is_package: bool  # True for directory packages, False for single .py files
     content_hash: str
     plugin_id: Optional[str] = None
+    package_name: Optional[str] = None  # pip package name for uninstall
 
 
 class VolumePluginEventHandler(FileSystemEventHandler):
@@ -166,12 +167,46 @@ class VolumeWatcher(SourceHandler):
     def source_type(self) -> PluginSource:
         return PluginSource.VOLUME
 
+    def _cleanup_stale_plugins(self) -> None:
+        """Clean up plugins whose source files were deleted while server was stopped."""
+        from vllm_dynamic_loader.core.registry import PluginRegistry
+
+        try:
+            registry = PluginRegistry()
+            volume_plugins = registry.list_by_type(PluginSource.VOLUME)
+
+            for plugin in volume_plugins:
+                source_path = Path(plugin.source_path)
+                # Only clean up plugins from this watch directory
+                if not str(source_path).startswith(str(self.watch_directory)):
+                    continue
+
+                if not source_path.exists():
+                    logger.info(f"Source deleted while stopped: {source_path}, cleaning up {plugin.name}")
+
+                    # Uninstall the pip package
+                    if plugin.name:
+                        result = self._pip.uninstall(plugin.name)
+                        if result.success:
+                            logger.info(f"Uninstalled stale package: {plugin.name}")
+                        else:
+                            logger.warning(f"Failed to uninstall {plugin.name}: {result.error}")
+
+                    # Remove from registry
+                    registry.remove(plugin.id)
+
+        except Exception as e:
+            logger.warning(f"Error during stale plugin cleanup: {e}")
+
     def start(self) -> None:
         """Start watching the directory."""
         if self._running:
             return
 
         self._running = True
+
+        # Clean up plugins that were deleted while server was stopped
+        self._cleanup_stale_plugins()
 
         # Initial scan
         self._scan_directory()
@@ -343,6 +378,7 @@ class VolumeWatcher(SourceHandler):
             path_key = str(path)
             if path_key in self._watched_plugins:
                 self._watched_plugins[path_key].plugin_id = result.plugin_info.id
+                self._watched_plugins[path_key].package_name = result.package_name
 
     def _handle_wheel_file(self, path: Path) -> None:
         """Handle detection of a new wheel file."""
@@ -352,6 +388,7 @@ class VolumeWatcher(SourceHandler):
             path_key = str(path)
             if path_key in self._watched_plugins:
                 self._watched_plugins[path_key].plugin_id = result.plugin_info.id
+                self._watched_plugins[path_key].package_name = result.package_name
 
     def _handle_plugin_modified(self, path: Path) -> None:
         """Handle modification of a plugin."""
@@ -593,11 +630,31 @@ build-backend = "setuptools.build_meta"
             logger.error(error_msg)
             return InstallResult(success=False, error=error_msg)
 
-    def uninstall(self, plugin_id: str) -> bool:
-        """Uninstall a plugin."""
+    def uninstall(self, plugin_id: str, package_name: Optional[str] = None) -> bool:
+        """Uninstall a plugin.
+
+        Args:
+            plugin_id: The plugin ID to uninstall.
+            package_name: Optional package name to uninstall via pip.
+                         If not provided, will try to find it from watched plugins.
+        """
         # Find the plugin in watched list
         for path_key, watched in list(self._watched_plugins.items()):
             if watched.plugin_id == plugin_id:
+                # Try to uninstall the pip package to remove entry points
+                # Priority: explicit arg > stored name > derived name
+                pkg_name = package_name or watched.package_name
+                if not pkg_name:
+                    # Fallback: derive package name from path
+                    pkg_name = self._sanitize_package_name(watched.path.stem)
+
+                if pkg_name:
+                    result = self._pip.uninstall(pkg_name)
+                    if result.success:
+                        logger.info(f"Uninstalled package {pkg_name}")
+                    else:
+                        logger.warning(f"Failed to uninstall package {pkg_name}: {result.error}")
+
                 self._notify_uninstall(plugin_id)
                 del self._watched_plugins[path_key]
                 return True

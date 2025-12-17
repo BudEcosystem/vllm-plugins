@@ -15,7 +15,7 @@ Key components:
 Environment Variables:
     VLLM_PLUGIN_WATCH_DIR: Directory to watch for plugins (default: /plugins)
     VLLM_PLUGIN_WATCH_ENABLED: Enable directory watching (default: true)
-    VLLM_PLUGIN_REGISTRY: Registry file path (default: /var/lib/vllm-plugins/registry.json)
+    VLLM_PLUGIN_REGISTRY: Registry file path (default: ~/.local/share/vllm-plugins/registry.json)
     VLLM_PLUGIN_AUTO_ACTIVATE: Auto-activate installed plugins (default: true)
     HOTSWAP_DEFAULT_PROCESSOR: Default logits processor (default: passthrough)
     HOTSWAP_GRACEFUL_TIMEOUT_MS: Timeout for graceful swap (default: 5000)

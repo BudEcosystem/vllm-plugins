@@ -24,7 +24,12 @@ class PluginLoaderConfig:
     # Registry settings
     registry_path: str = field(
         default_factory=lambda: os.environ.get(
-            "VLLM_PLUGIN_REGISTRY", "/var/lib/vllm-plugins/registry.json"
+            "VLLM_PLUGIN_REGISTRY",
+            os.path.join(
+                os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share")),
+                "vllm-plugins",
+                "registry.json",
+            ),
         )
     )
 
