@@ -10,6 +10,7 @@ from typing import Callable, Dict, Optional
 from urllib.parse import urlparse
 
 from vllm_dynamic_loader.core.registry import PluginInfo, PluginSource, PluginState
+from vllm_dynamic_loader.plugin_manifest import PluginManifest, load_manifest
 from vllm_dynamic_loader.sources.base import InstallResult, SourceHandler
 from vllm_dynamic_loader.utils.pip_wrapper import PipWrapper
 
@@ -107,6 +108,9 @@ class GitInstaller(SourceHandler):
                 commit: Override commit
                 editable: Override editable mode
                 depth: Shallow clone depth (default: 1)
+                version_check: Callable[[PluginManifest], bool] - Optional callback
+                    to check version compatibility. If provided and returns False,
+                    installation is aborted.
 
         Returns:
             InstallResult with installation outcome.
@@ -116,6 +120,7 @@ class GitInstaller(SourceHandler):
         commit = kwargs.get("commit")
         editable = kwargs.get("editable", self._editable)
         depth = kwargs.get("depth", 1)
+        version_check = kwargs.get("version_check")
 
         try:
             git_ref = parse_git_url(source)
@@ -142,8 +147,27 @@ class GitInstaller(SourceHandler):
             if git_ref.subdirectory:
                 install_path = clone_path / git_ref.subdirectory
                 if not install_path.exists():
+                    shutil.rmtree(clone_path, ignore_errors=True)
                     return InstallResult(
                         success=False, error=f"Subdirectory not found: {git_ref.subdirectory}"
+                    )
+
+            # Load plugin manifest if present
+            manifest = load_manifest(install_path)
+            if manifest:
+                logger.debug(f"Found plugin manifest: {manifest.name or 'unnamed'}")
+
+            # Check version compatibility if callback provided
+            if version_check is not None and manifest is not None:
+                if not version_check(manifest):
+                    logger.info(
+                        f"Plugin version check failed, cleaning up clone at {clone_path}"
+                    )
+                    shutil.rmtree(clone_path, ignore_errors=True)
+                    return InstallResult(
+                        success=False,
+                        error="vLLM version not compatible with plugin requirements",
+                        manifest=manifest,
                     )
 
             # Install the package
@@ -152,13 +176,18 @@ class GitInstaller(SourceHandler):
             if result.success:
                 plugin_id = f"git_{hashlib.md5(source.encode()).hexdigest()[:8]}"
 
+                # Use manifest name if available
+                plugin_name = result.package_name or clone_path.name
+                if manifest and manifest.name:
+                    plugin_name = manifest.name
+
                 plugin_info = PluginInfo(
                     id=plugin_id,
-                    name=result.package_name or clone_path.name,
+                    name=plugin_name,
                     source=PluginSource.GIT,
                     source_path=source,
                     install_path=str(install_path),
-                    version=result.version,
+                    version=result.version or (manifest.version if manifest else None),
                     state=PluginState.INSTALLED,
                 )
 
@@ -172,6 +201,7 @@ class GitInstaller(SourceHandler):
                     package_name=result.package_name,
                     install_path=str(install_path),
                     version=result.version,
+                    manifest=manifest,
                 )
             else:
                 # Cleanup on failure

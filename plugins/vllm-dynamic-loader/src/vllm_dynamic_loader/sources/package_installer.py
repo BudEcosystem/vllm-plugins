@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 import requests
 
 from vllm_dynamic_loader.core.registry import PluginInfo, PluginSource, PluginState
+from vllm_dynamic_loader.plugin_manifest import PluginManifest, load_manifest
 from vllm_dynamic_loader.sources.base import InstallResult, SourceHandler
 from vllm_dynamic_loader.utils.pip_wrapper import PipWrapper
 
@@ -63,10 +64,12 @@ class PackageInstaller(SourceHandler):
                 - PyPI with version: "vllm-my-plugin>=0.1.0"
                 - Wheel URL: "https://example.com/plugin.whl"
                 - Local wheel path: "/path/to/plugin.whl"
+                - Local directory path: "/path/to/plugin/"
             **kwargs:
                 upgrade: bool - Upgrade if already installed
                 force_reinstall: bool - Force reinstall
                 extra_index_url: str - Additional PyPI index
+                editable: bool - Install in editable mode (for local directories)
 
         Returns:
             InstallResult with installation outcome.
@@ -74,6 +77,7 @@ class PackageInstaller(SourceHandler):
         upgrade = kwargs.get("upgrade", False)
         force_reinstall = kwargs.get("force_reinstall", False)
         extra_index_url = kwargs.get("extra_index_url")
+        editable = kwargs.get("editable", True)
 
         try:
             # Determine source type
@@ -81,6 +85,8 @@ class PackageInstaller(SourceHandler):
                 return self._install_from_url(source, upgrade, force_reinstall)
             elif self._is_local_wheel(source):
                 return self._install_from_local_wheel(source, upgrade, force_reinstall)
+            elif self._is_local_directory(source):
+                return self._install_from_local_directory(source, editable)
             else:
                 return self._install_from_pypi(source, upgrade, force_reinstall, extra_index_url)
 
@@ -97,6 +103,10 @@ class PackageInstaller(SourceHandler):
     def _is_local_wheel(self, source: str) -> bool:
         """Check if source is a local wheel file."""
         return source.endswith(".whl") and os.path.isfile(source)
+
+    def _is_local_directory(self, source: str) -> bool:
+        """Check if source is a local directory (plugin folder)."""
+        return os.path.isdir(source)
 
     def _install_from_pypi(
         self,
@@ -221,6 +231,61 @@ class PackageInstaller(SourceHandler):
                 plugin_info=plugin_info,
                 package_name=result.package_name,
                 version=result.version,
+            )
+        else:
+            return InstallResult(success=False, error=result.error)
+
+    def _install_from_local_directory(
+        self,
+        path: str,
+        editable: bool = True,
+    ) -> InstallResult:
+        """Install a local plugin directory.
+
+        Args:
+            path: Path to the plugin directory containing pyproject.toml or setup.py.
+            editable: Install in editable mode (default: True).
+
+        Returns:
+            InstallResult with installation outcome.
+        """
+        logger.info(f"Installing from local directory: {path} (editable={editable})")
+
+        # Load plugin manifest if present
+        manifest = load_manifest(Path(path))
+        if manifest:
+            logger.debug(f"Found plugin manifest: {manifest.name or 'unnamed'}")
+
+        result = self._pip.install_local(path, editable=editable)
+
+        if result.success:
+            plugin_id = f"local_{hashlib.md5(path.encode()).hexdigest()[:8]}"
+
+            # Use manifest name if available
+            plugin_name = result.package_name or Path(path).name
+            if manifest and manifest.name:
+                plugin_name = manifest.name
+
+            plugin_info = PluginInfo(
+                id=plugin_id,
+                name=plugin_name,
+                source=PluginSource.PACKAGE,
+                source_path=path,
+                install_path=path,
+                version=result.version or (manifest.version if manifest else None),
+                state=PluginState.INSTALLED,
+            )
+
+            self._installed[plugin_id] = plugin_info
+            self._notify_install(plugin_info)
+
+            return InstallResult(
+                success=True,
+                plugin_info=plugin_info,
+                package_name=result.package_name,
+                install_path=path,
+                version=result.version,
+                manifest=manifest,
             )
         else:
             return InstallResult(success=False, error=result.error)

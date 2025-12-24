@@ -76,6 +76,14 @@ def register() -> None:
             else:
                 logger.info("Plugin directory watching disabled")
 
+            # Install plugins from configuration file
+            try:
+                results = _loader_instance.install_initial_plugins()
+                if results:
+                    logger.info(f"Installed {sum(results.values())}/{len(results)} plugins from config")
+            except Exception as e:
+                logger.warning(f"Failed to install plugins from config: {e}")
+
             # Initialize REST API
             api_enabled = os.environ.get("VLLM_PLUGIN_API_ENABLED", "true").lower() == "true"
             if api_enabled:

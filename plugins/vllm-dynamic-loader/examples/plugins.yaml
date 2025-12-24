@@ -1,0 +1,88 @@
+# =============================================================================
+# vLLM Plugin Configuration File
+# =============================================================================
+# Location: ~/.config/vllm/plugins.yaml
+# Or set via: VLLM_PLUGIN_CONFIG=/path/to/plugins.yaml
+#
+# This file defines plugins to install automatically when vLLM starts.
+# =============================================================================
+
+plugins:
+  # ---------------------------------------------------------------------------
+  # PyPI Packages
+  # ---------------------------------------------------------------------------
+  # Install plugins directly from PyPI
+
+  - source: pypi
+    package: vllm-entropy-decoder
+    version: ">=0.1.0"              # Optional: version constraint
+    # vllm_min: "0.6.0"             # Optional: minimum vLLM version (inclusive)
+    # vllm_max: "0.8.0"             # Optional: maximum vLLM version (exclusive)
+    # enabled: true                 # Optional: set to false to skip (default: true)
+
+  - source: pypi
+    package: vllm-cot-decoder
+    # No version constraint - installs latest
+
+  # Example: Plugin only for specific vLLM versions
+  - source: pypi
+    package: vllm-legacy-feature
+    vllm_min: "0.5.0"
+    vllm_max: "0.7.0"               # Only installs on vLLM 0.5.x and 0.6.x
+
+  # ---------------------------------------------------------------------------
+  # Local Plugins (Development)
+  # ---------------------------------------------------------------------------
+  # Install from local filesystem - great for development
+
+  - source: local
+    path: ~/projects/my-vllm-plugin    # Supports ~ expansion
+    editable: true                      # Default: true (pip install -e)
+    # vllm_min: "0.6.0"                 # Optional: override manifest constraints
+
+  - source: local
+    path: /opt/plugins/production-plugin
+    editable: false                     # Non-editable install
+
+  # ---------------------------------------------------------------------------
+  # Git Repositories
+  # ---------------------------------------------------------------------------
+  # Clone and install from git repos
+
+  - source: git
+    url: https://github.com/org/vllm-custom-plugin
+    ref: main                           # Optional: branch, tag, or commit
+    editable: true                      # Optional: default true
+
+  # Install specific version/tag
+  - source: git
+    url: https://github.com/org/vllm-stable-plugin
+    ref: v1.2.0                         # Install specific tag
+
+  # Install from a monorepo subdirectory
+  - source: git
+    url: https://github.com/org/vllm-plugins-monorepo
+    ref: main
+    subdirectory: plugins/entropy-decoder   # Path within repo
+
+  # Another plugin from the same monorepo
+  - source: git
+    url: https://github.com/org/vllm-plugins-monorepo
+    ref: main
+    subdirectory: plugins/cot-decoder
+
+  # ---------------------------------------------------------------------------
+  # Disabled Plugins
+  # ---------------------------------------------------------------------------
+  # Use enabled: false to temporarily disable without removing
+
+  - source: pypi
+    package: vllm-experimental-feature
+    enabled: false                      # Won't be installed
+
+# =============================================================================
+# Hot-Swap Configuration
+# =============================================================================
+# Set the default logits processor to activate at startup
+
+default_processor: entropy              # Options: entropy, cot, passthrough, etc.

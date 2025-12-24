@@ -1,0 +1,97 @@
+# =============================================================================
+# vLLM Plugin Manifest File
+# =============================================================================
+# Location: Place this file in your plugin's root directory
+# Filename: vllm-plugin.yaml (also supports: vllm-plugin.yml, vllm_plugin.yaml)
+#
+# This manifest declares plugin metadata and vLLM version compatibility.
+# The dynamic loader reads this file to determine if the plugin is compatible
+# with the current vLLM installation.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Plugin Metadata
+# ---------------------------------------------------------------------------
+
+name: my-awesome-vllm-plugin
+description: |
+  A custom logits processor that implements adaptive entropy-based decoding
+  for improved text generation quality.
+version: 1.0.0
+author: Your Name <your.email@example.com>
+license: Apache-2.0
+homepage: https://github.com/yourname/my-awesome-vllm-plugin
+
+# ---------------------------------------------------------------------------
+# Categorization
+# ---------------------------------------------------------------------------
+# Tags help users discover and categorize plugins
+
+tags:
+  - logits-processor
+  - decoding
+  - entropy
+  - sampling
+  - experimental
+
+# ---------------------------------------------------------------------------
+# vLLM Version Compatibility
+# ---------------------------------------------------------------------------
+# Specify which vLLM versions this plugin supports.
+# If the installed vLLM version doesn't match, the plugin won't be installed.
+#
+# Note: User config (plugins.yaml) can override these constraints.
+
+vllm_min: "0.6.0"      # Minimum vLLM version (inclusive)
+vllm_max: "0.9.0"      # Maximum vLLM version (exclusive)
+                        # This plugin works with vLLM 0.6.x, 0.7.x, 0.8.x
+
+# Examples of version constraints:
+#
+# Only minimum version:
+#   vllm_min: "0.7.0"
+#   # Works with vLLM 0.7.0 and all future versions
+#
+# Only maximum version:
+#   vllm_max: "0.8.0"
+#   # Works with any vLLM version before 0.8.0
+#
+# Specific minor version range:
+#   vllm_min: "0.7.0"
+#   vllm_max: "0.8.0"
+#   # Only works with vLLM 0.7.x
+#
+# No constraints (omit both fields):
+#   # Works with any vLLM version
+
+# ---------------------------------------------------------------------------
+# Additional Dependencies
+# ---------------------------------------------------------------------------
+# Extra pip packages required by this plugin (beyond vLLM itself)
+# These will be noted in logs but NOT auto-installed currently.
+
+dependencies:
+  - numpy>=1.20.0
+  - scipy>=1.7.0
+  - torch>=2.0.0
+
+# ---------------------------------------------------------------------------
+# Entry Points (Optional)
+# ---------------------------------------------------------------------------
+# Override or declare entry points. Usually not needed as pyproject.toml
+# handles this, but can be useful for dynamic plugins.
+
+entry_points:
+  vllm.logits_processors: my_processor
+  vllm.general_plugins: register
+
+# =============================================================================
+# Example: Minimal Manifest
+# =============================================================================
+# A minimal manifest only needs the version constraints:
+#
+# vllm_min: "0.6.0"
+# vllm_max: "0.9.0"
+#
+# All other fields are optional but recommended for discoverability.
+# =============================================================================

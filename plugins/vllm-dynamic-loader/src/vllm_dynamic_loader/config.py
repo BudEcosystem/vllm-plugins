@@ -1,4 +1,9 @@
-"""Configuration via environment variables."""
+"""Configuration via environment variables.
+
+Environment Variables:
+    VLLM_PLUGIN_CONFIG: Path to the plugin configuration file (YAML).
+                        If not set, defaults to ~/.config/vllm/plugins.yaml
+"""
 
 import os
 from dataclasses import dataclass, field
@@ -10,11 +15,12 @@ class PluginLoaderConfig:
     """Configuration for the dynamic plugin loader."""
 
     # Volume watcher settings
+    # Disabled by default - use config file for plugin management instead
     watch_directory: str = field(
         default_factory=lambda: os.environ.get("VLLM_PLUGIN_WATCH_DIR", "/plugins")
     )
     watch_enabled: bool = field(
-        default_factory=lambda: os.environ.get("VLLM_PLUGIN_WATCH_ENABLED", "true").lower()
+        default_factory=lambda: os.environ.get("VLLM_PLUGIN_WATCH_ENABLED", "false").lower()
         == "true"
     )
     watch_poll_interval: float = field(
@@ -73,6 +79,11 @@ class PluginLoaderConfig:
             for s in os.environ.get("VLLM_PLUGIN_TRUSTED_SOURCES", "").split(",")
             if s.strip()
         ]
+    )
+
+    # Plugin configuration file
+    config_file_path: Optional[str] = field(
+        default_factory=lambda: os.environ.get("VLLM_PLUGIN_CONFIG")
     )
 
 

@@ -4,8 +4,13 @@ Dynamic plugin loader for vLLM - load, unload, and hot-swap plugins at runtime w
 
 ## Features
 
+- **Configuration File**: Define plugins to install at startup via YAML config
+  - PyPI packages with version constraints
+  - Git repositories with branch/tag/commit support
+  - Local filesystem paths for development
+
 - **Dynamic Plugin Loading**: Install plugins from multiple sources at runtime
-  - Mounted volumes: Watch a directory for new plugin files
+  - Mounted volumes: Watch a directory for new plugin files (optional)
   - PyPI/wheel URLs: Install from package repositories
   - Git repositories: Clone and install directly
 
@@ -30,19 +35,46 @@ pip install -e "plugins/vllm-dynamic-loader/.[dev]"
 
 ## Quick Start
 
-### 1. Start vLLM with Dynamic Loader
+### 1. Create a Plugin Configuration File (Recommended)
 
-The plugin registers automatically via entry points:
+Create `~/.config/vllm/plugins.yaml` to define plugins that should be installed at startup:
 
-```bash
-# Set watch directory (optional)
-export VLLM_PLUGIN_WATCH_DIR=/path/to/plugins
+```yaml
+# Plugins to install at vLLM startup
+plugins:
+  # Install from PyPI
+  - source: pypi
+    package: vllm-entropy-decoder
+    version: ">=0.1.0"
 
-# Start vLLM normally
-vllm serve your-model
+  # Install from a local folder (great for development)
+  - source: local
+    path: ~/projects/my-vllm-plugin
+    editable: true  # default: true
+
+  # Install from Git repository
+  - source: git
+    url: https://github.com/org/vllm-plugins
+    ref: main
+    subdirectory: plugins/vllm-cot-decoder  # for monorepos
+
+# Optional: set default logits processor
+default_processor: entropy
 ```
 
-### 2. Install Plugins at Runtime
+### 2. Start vLLM
+
+The plugin registers automatically via entry points and installs plugins from the config file:
+
+```bash
+# Start vLLM normally - plugins are installed from config
+vllm serve your-model
+
+# Or specify a custom config file location
+VLLM_PLUGIN_CONFIG=/path/to/plugins.yaml vllm serve your-model
+```
+
+### 3. Install Plugins at Runtime (Optional)
 
 **Via REST API:**
 
@@ -58,11 +90,16 @@ curl -X POST http://localhost:8000/plugins/install/git \
   -d '{"repo_url": "https://github.com/org/my-plugin", "branch": "main"}'
 ```
 
-**Via Mounted Volume:**
+**Via Mounted Volume (requires enabling watcher):**
 
-Simply drop plugin files into the watch directory:
+Enable the directory watcher and drop plugin files into the watch directory:
 
 ```bash
+# Enable the watcher (disabled by default)
+export VLLM_PLUGIN_WATCH_ENABLED=true
+export VLLM_PLUGIN_WATCH_DIR=/path/to/plugins
+
+# Start vLLM, then drop plugins into the directory
 cp my_processor.py /path/to/plugins/
 # Automatically detected and loaded!
 ```
@@ -108,12 +145,77 @@ app = PluginAPIMiddleware(your_app)
 
 ## Configuration
 
-Environment variables:
+### Plugin Configuration File
+
+The recommended way to manage plugins is via a YAML configuration file.
+
+**File Location (in priority order):**
+1. Path specified by `VLLM_PLUGIN_CONFIG` environment variable
+2. `~/.config/vllm/plugins.yaml` (XDG config directory)
+
+> See [examples/plugins.yaml](examples/plugins.yaml) for a complete example with all options.
+
+**Full Configuration Reference:**
+
+```yaml
+plugins:
+  # PyPI package
+  - source: pypi
+    package: vllm-entropy-decoder  # required
+    version: ">=0.1.0"             # optional: version constraint
+    enabled: true                  # optional: skip if false (default: true)
+    vllm_min: "0.6.0"              # optional: minimum vLLM version (inclusive)
+    vllm_max: "0.8.0"              # optional: maximum vLLM version (exclusive)
+
+  # Local filesystem path
+  - source: local
+    path: ~/projects/my-plugin    # required: supports ~ expansion
+    editable: true                # optional: pip install -e (default: true)
+    vllm_min: "0.6.0"             # optional: minimum vLLM version
+
+  # Git repository
+  - source: git
+    url: https://github.com/org/repo  # required
+    ref: main                         # optional: branch, tag, or commit
+    subdirectory: plugins/my-plugin   # optional: for monorepos
+    editable: true                    # optional (default: true)
+
+# Optional: default logits processor for hot-swap
+default_processor: entropy
+```
+
+**vLLM Version Constraints:**
+
+Use `vllm_min` and `vllm_max` to specify compatible vLLM versions:
+- `vllm_min`: Minimum required version (inclusive). Plugin won't install if vLLM is older.
+- `vllm_max`: Maximum supported version (exclusive). Plugin won't install if vLLM is newer.
+- If not specified, the plugin installs regardless of vLLM version.
+
+```yaml
+plugins:
+  # Only for vLLM 0.6.x
+  - source: pypi
+    package: vllm-legacy-plugin
+    vllm_min: "0.6.0"
+    vllm_max: "0.7.0"
+
+  # For vLLM 0.7.0 and newer
+  - source: pypi
+    package: vllm-modern-plugin
+    vllm_min: "0.7.0"
+
+  # No version constraint - always installs
+  - source: pypi
+    package: vllm-universal-plugin
+```
+
+### Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `VLLM_PLUGIN_CONFIG` | - | Path to plugin configuration file (YAML) |
 | `VLLM_PLUGIN_WATCH_DIR` | `/plugins` | Directory to watch for plugins |
-| `VLLM_PLUGIN_WATCH_ENABLED` | `true` | Enable directory watching |
+| `VLLM_PLUGIN_WATCH_ENABLED` | `false` | Enable directory watching (use config file instead) |
 | `VLLM_PLUGIN_REGISTRY` | `~/.local/share/vllm-plugins/registry.json` | Registry file path |
 | `VLLM_PLUGIN_AUTO_ACTIVATE` | `true` | Auto-activate installed plugins |
 | `VLLM_PLUGIN_API_ENABLED` | `true` | Enable REST API |
@@ -140,6 +242,35 @@ Environment variables:
 
 ## Docker Usage
 
+### Using Configuration File (Recommended)
+
+```dockerfile
+FROM budstudio/vllm:latest
+
+# Install dynamic loader
+COPY plugins/vllm-dynamic-loader /app/plugins/vllm-dynamic-loader
+RUN pip install -e /app/plugins/vllm-dynamic-loader/.[api]
+
+# Copy plugin configuration
+COPY plugins.yaml /root/.config/vllm/plugins.yaml
+```
+
+```yaml
+# docker-compose.yml
+services:
+  vllm:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./plugins.yaml:/root/.config/vllm/plugins.yaml:ro
+      - ./local-plugins:/app/local-plugins:ro  # for local source plugins
+    environment:
+      - HOTSWAP_DEFAULT_PROCESSOR=entropy
+```
+
+### Using Directory Watcher
+
 ```dockerfile
 FROM budstudio/vllm:latest
 
@@ -150,7 +281,7 @@ RUN pip install -e /app/plugins/vllm-dynamic-loader/.[api]
 # Create plugin directory
 RUN mkdir -p /plugins
 
-# Set environment
+# Enable watcher
 ENV VLLM_PLUGIN_WATCH_DIR=/plugins
 ENV VLLM_PLUGIN_WATCH_ENABLED=true
 ```
@@ -166,6 +297,7 @@ services:
       - ./my-plugins:/plugins
     environment:
       - VLLM_PLUGIN_WATCH_DIR=/plugins
+      - VLLM_PLUGIN_WATCH_ENABLED=true
       - HOTSWAP_DEFAULT_PROCESSOR=entropy
 ```
 
@@ -198,6 +330,50 @@ class MyProcessor(LogitsProcessor):
 def register():
     pass  # Optional registration logic
 ```
+
+### Plugin Manifest File
+
+Plugin developers can include a `vllm-plugin.yaml` manifest file in their plugin root to declare metadata and version compatibility. This allows the plugin to specify its own vLLM version requirements.
+
+> See [examples/vllm-plugin.yaml](examples/vllm-plugin.yaml) for a complete example with all options.
+
+**Create `vllm-plugin.yaml` in your plugin root:**
+
+```yaml
+# Plugin metadata
+name: my-vllm-plugin
+description: A custom logits processor for adaptive decoding
+version: 1.0.0
+author: Your Name
+license: Apache-2.0
+homepage: https://github.com/yourname/my-vllm-plugin
+
+# Categorization
+tags:
+  - logits-processor
+  - decoding
+  - experimental
+
+# vLLM version compatibility
+vllm_min: "0.6.0"    # Minimum vLLM version (inclusive)
+vllm_max: "0.9.0"    # Maximum vLLM version (exclusive)
+
+# Additional pip dependencies (optional)
+dependencies:
+  - numpy>=1.20
+  - scipy
+```
+
+**How version constraints work:**
+
+1. **User config takes precedence**: If `vllm_min`/`vllm_max` is specified in `plugins.yaml`, those values are used.
+2. **Manifest as fallback**: If the user doesn't specify version constraints, the plugin's manifest constraints are checked.
+3. **No constraints = always install**: If neither user config nor manifest specifies constraints, the plugin installs regardless of vLLM version.
+
+**Supported manifest filenames** (checked in order):
+- `vllm-plugin.yaml`
+- `vllm-plugin.yml`
+- `vllm_plugin.yaml`
 
 ## Known Limitations
 

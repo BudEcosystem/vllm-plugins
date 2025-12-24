@@ -8,13 +8,13 @@ WORKDIR /app
 
 # Copy all plugins
 COPY plugins/ /app/plugins/
-COPY shared/ /app/shared/
+# COPY shared/ /app/shared/
 
 # Install shared utilities
-RUN pip install -e /app/shared/
+# RUN pip install -e /app/shared/
 
 # Install decoding strategy plugins
-RUN pip install -e /app/plugins/vllm-entropy-decoder/
+# RUN pip install -e /app/plugins/vllm-entropy-decoder/
 # RUN pip install -e /app/plugins/vllm-cot-decoder/
 RUN pip install -e /app/plugins/vllm-dynamic-loader/.[api]
 

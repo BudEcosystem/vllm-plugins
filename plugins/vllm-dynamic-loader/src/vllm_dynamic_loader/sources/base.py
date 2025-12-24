@@ -2,10 +2,13 @@
 
 import abc
 import logging
-from dataclasses import dataclass
-from typing import Callable, Optional
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from vllm_dynamic_loader.core.registry import PluginInfo, PluginSource
+
+if TYPE_CHECKING:
+    from vllm_dynamic_loader.plugin_manifest import PluginManifest
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +23,7 @@ class InstallResult:
     install_path: Optional[str] = None
     version: Optional[str] = None
     error: Optional[str] = None
+    manifest: Optional[Any] = None  # PluginManifest, using Any to avoid circular import
 
 
 class SourceHandler(abc.ABC):
